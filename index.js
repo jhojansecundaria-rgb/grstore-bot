@@ -167,7 +167,7 @@ app.post('/webhook', async (req, res) => {
 // Keep alive 24/7
 const https = require('https');
 setInterval(() => {
-  https.get('https://grstore-bot-production.up.railway.app/ping', () => {
+  https.get('https://grstore-bot-production-ad73.up.railway.app/ping', () => {
     console.log('Keep-alive OK');
   }).on('error', (e) => {
     console.error('Keep-alive error: ' + e.message);
