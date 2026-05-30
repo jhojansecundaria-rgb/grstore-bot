@@ -1,12 +1,10 @@
 require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
-const Anthropic = require('@anthropic-ai/sdk');
 
 const app = express();
 app.use(express.json());
 
-const claude = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const chats = {};
 
 const CATALOGO = `
@@ -75,22 +73,45 @@ REGLAS:
 - Se amable y usa pocos emojis
 - Si preguntan por envio di que un asesor confirmara el costo segun la ciudad`;
 
-async function responder(numero, mensaje) {
+async function preguntarGemini(numero, mensajeNuevo) {
   if (!chats[numero]) {
     chats[numero] = [];
   }
 
-  chats[numero].push({ role: 'user', content: mensaje });
-
-  const resultado = await claude.messages.create({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 600,
-    system: SYSTEM_PROMPT,
-    messages: chats[numero],
+  chats[numero].push({
+    role: 'user',
+    parts: [{ text: mensajeNuevo }],
   });
 
-  const texto = resultado.content[0].text;
-  chats[numero].push({ role: 'assistant', content: texto });
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
+
+  const body = {
+    system_instruction: {
+      parts: [{ text: SYSTEM_PROMPT }],
+    },
+    contents: chats[numero],
+    generationConfig: {
+      maxOutputTokens: 600,
+      temperature: 0.7,
+    },
+  };
+
+  const respuesta = await axios.post(url, body, {
+    headers: { 'Content-Type': 'application/json' },
+  });
+
+  const texto = respuesta.data.candidates[0].content.parts[0].text;
+
+  chats[numero].push({
+    role: 'model',
+    parts: [{ text: texto }],
+  });
+
+  return texto;
+}
+
+async function responder(numero, mensaje) {
+  const texto = await preguntarGemini(numero, mensaje);
 
   if (texto.includes('PEDIDO_LISTO')) {
     await notificarme(texto, numero);
